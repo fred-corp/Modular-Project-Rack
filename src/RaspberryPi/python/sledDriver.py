@@ -45,7 +45,10 @@ def init_graph_queues(zero=False):
 
 def get_IP():
   interfaces = psutil.net_if_addrs()
-  IP = interfaces['eth0'][0].address
+  if psutil.net_if_addrs()['eth0'][0].family == AddressFamily.AF_INET:
+    IP = interfaces['eth0'][0].address
+  else:
+    IP = "No IPV4"
   return IP
 
 def get_CPU():
@@ -72,7 +75,7 @@ def drawDisplay():
   private_ip = get_IP()
   # Draw IP
   draw.rectangle(xy=[(0, 0), (127, 15)], fill=255, outline=0)
-  draw.text(((6*len(private_ip))/2, 2), str(private_ip), font=font, fill=0)
+  draw.text((64-((6*len(private_ip))/2), 2), private_ip, font=font, fill=0)
 
   # Draw blanking rectangle
   draw.rectangle(xy=[(40, 16), (127, 63)], fill=0, outline=0)
