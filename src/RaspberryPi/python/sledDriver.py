@@ -12,6 +12,7 @@ from PIL import ImageFont
 max_temp_graph = 80
 min_temp_graph = 15
 
+# Create display
 oled = Adafruit_SSD1306.SSD1306_128_64(rst=None)
 oled.begin()
 oled.clear()
@@ -23,19 +24,23 @@ image = Image.new('1', (width, height))
 font = ImageFont.load_default()
 draw = ImageDraw.Draw(image)
 
-# Create queues for graphs and initialize them
+# Create queues for graphs
 cpu_graph_queue = queue.Queue(maxsize=width-72)
 temp_graph_queue = queue.Queue(maxsize=width-72)
 ram_graph_queue = queue.Queue(maxsize=width-72)
 
-while not cpu_graph_queue.full():
-  cpu_graph_queue.put(0)
+# Init queues for graphs
+def init_graph_queues(zero=False):
 
-while not temp_graph_queue.full():
-  temp_graph_queue.put(min_temp_graph)
+  if zero:
+    while not cpu_graph_queue.full():
+      cpu_graph_queue.put(0)
 
-while not ram_graph_queue.full():
-  ram_graph_queue.put(0)
+    while not temp_graph_queue.full():
+      temp_graph_queue.put(min_temp_graph)
+
+    while not ram_graph_queue.full():
+      ram_graph_queue.put(0)
 
 
 def get_IP():
@@ -62,7 +67,7 @@ draw.text((2, 18), 'CPU  :', font=font, fill=255)
 draw.text((2, 34), 'Temp :', font=font, fill=255)
 draw.text((2, 50), 'RAM  :', font=font, fill=255)
 
-while True:
+def drawDisplay():
   # IP
   private_ip = get_IP()
   # Draw IP
@@ -126,4 +131,15 @@ while True:
   oled.image(image)
   oled.display()
 
-  time.sleep(2.5)
+
+if __name__ == '__main__':
+  init_graph_queues(zero=True)
+  try:
+    while True:
+      drawDisplay()
+      time.sleep(1)
+  except KeyboardInterrupt:
+    oled.clear()
+    oled.display()
+    print("\n")
+    exit()
