@@ -1,6 +1,8 @@
 import time
 import psutil
 import queue
+import RPi.GPIO as GPIO
+from socket import AddressFamily
 
 import Adafruit_GPIO.SPI as SPI
 import Adafruit_SSD1306
@@ -11,6 +13,13 @@ from PIL import ImageFont
 
 max_temp_graph = 80
 min_temp_graph = 15
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
+
+button = 4
+GPIO.setup(button, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
 
 # Create display
 oled = Adafruit_SSD1306.SSD1306_128_64(rst=None)
@@ -70,6 +79,23 @@ draw.text((2, 18), 'CPU  :', font=font, fill=255)
 draw.text((2, 34), 'Temp :', font=font, fill=255)
 draw.text((2, 50), 'RAM  :', font=font, fill=255)
 
+def update_queues():
+  cpu_pct = get_CPU()
+  if cpu_graph_queue.full():
+    cpu_graph_queue.get()
+  cpu_graph_queue.put(cpu_pct)
+
+  temp = get_Temp()
+  if temp_graph_queue.full():
+    temp_graph_queue.get()
+  temp_graph_queue.put(temp)
+
+  ram = get_RAM()
+  if ram_graph_queue.full():
+    ram_graph_queue.get()
+  ram_graph_queue.put(ram)
+
+
 def drawDisplay():
   # IP
   private_ip = get_IP()
@@ -82,14 +108,8 @@ def drawDisplay():
 
 
   # CPU
-  cpu_pct = get_CPU()
   # Draw CPU Text
-  draw.text((40, 18), str(cpu_pct) + '%', font=font, fill=255)
-
-  # Add CPU to graph queue
-  if cpu_graph_queue.full():
-    cpu_graph_queue.get()
-  cpu_graph_queue.put(cpu_pct)
+  draw.text((40, 18), str(cpu_graph_queue.queue[cpu_graph_queue.qsize()-1]) + '%', font=font, fill=255)
 
   # Draw CPU Graph
   draw.line(xy=[(72, 30), (127, 30)], fill=255, width=1)
@@ -99,14 +119,8 @@ def drawDisplay():
 
 
   # Temp
-  temp = get_Temp()
   # Draw Temp
-  draw.text((40, 34), str(temp) + 'C', font=font, fill=255)
-
-  # Add Temp to graph queue
-  if temp_graph_queue.full():
-    temp_graph_queue.get()
-  temp_graph_queue.put(temp)
+  draw.text((40, 34), str(temp_graph_queue.queue[temp_graph_queue.qsize()-1]) + 'C', font=font, fill=255)
 
   # Draw Temp Graph
   draw.line(xy=[(72, 46), (127, 46)], fill=255, width=1)
@@ -116,14 +130,8 @@ def drawDisplay():
 
 
   # RAM
-  ram = get_RAM()
   # Draw RAM
-  draw.text((40, 50), str(ram) + '%', font=font, fill=255)
-
-  # Add RAM to graph queue
-  if ram_graph_queue.full():
-    ram_graph_queue.get()
-  ram_graph_queue.put(ram)
+  draw.text((40, 50), str(ram_graph_queue.queue[ram_graph_queue.qsize()-1]) + '%', font=font, fill=255)
 
   # Draw RAM Graph
   draw.line(xy=[(72, 62), (127, 62)], fill=255, width=1)
@@ -136,11 +144,36 @@ def drawDisplay():
 
 
 if __name__ == '__main__':
+  GPIO.add_event_detect(button, GPIO.FALLING)
   init_graph_queues(zero=True)
+  refresh_interval = 1
+  display_sleep_time = 30
   try:
+    displaySleep = False
+    displaySleepTimeLast = time.time()
+    displayTimeLast = time.time()
+    queuesTimeLast = time.time()
     while True:
-      drawDisplay()
-      time.sleep(1)
+      timeNow = time.time()
+
+      if GPIO.event_detected(button):
+        displaySleep = False
+        displaySleepTimeLast = timeNow
+      else:
+        if not displaySleep and timeNow-displaySleepTimeLast > display_sleep_time:
+          oled.clear()
+          oled.display()
+          displaySleep = True
+          displayTimeLast = timeNow
+        else: 
+          if timeNow-displayTimeLast > refresh_interval and not displaySleep:
+            drawDisplay()
+            DisplayTimeLast = timeNow
+
+        if timeNow-queuesTimeLast > refresh_interval:
+          update_queues()
+          queuesTimeLast = timeNow
+
   except KeyboardInterrupt:
     oled.clear()
     oled.display()
