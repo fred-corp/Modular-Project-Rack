@@ -146,33 +146,33 @@ def drawDisplay():
 if __name__ == '__main__':
   GPIO.add_event_detect(button, GPIO.FALLING)
   init_graph_queues(zero=True)
-  refresh_interval = 1
+  refresh_interval = 2.5
   display_sleep_time = 30
   try:
     displaySleep = False
     displaySleepTimeLast = time.time()
     displayTimeLast = time.time()
-    queuesTimeLast = time.time()
     while True:
       timeNow = time.time()
 
       if GPIO.event_detected(button):
         displaySleep = False
         displaySleepTimeLast = timeNow
+        displayTimeLast = timeNow
       else:
         if not displaySleep and timeNow-displaySleepTimeLast > display_sleep_time:
           oled.clear()
           oled.display()
           displaySleep = True
-          displayTimeLast = timeNow
-        else: 
-          if timeNow-displayTimeLast > refresh_interval and not displaySleep:
-            drawDisplay()
-            DisplayTimeLast = timeNow
+          displaySleepTimeLast = timeNow
 
-        if timeNow-queuesTimeLast > refresh_interval:
+        if timeNow-displayTimeLast > refresh_interval:
+          if not displaySleep:
+            drawDisplay()
           update_queues()
-          queuesTimeLast = timeNow
+          displayTimeLast = timeNow
+      
+      time.sleep(1)
 
   except KeyboardInterrupt:
     oled.clear()
